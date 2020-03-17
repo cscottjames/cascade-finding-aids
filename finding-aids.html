@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+        <link href="https://www.catholic.edu/assets/stylesheets/style.css" rel="stylesheet" type="text/css"/>
+        <title></title>
+    </head>
+    <body>
+    <!-- Loading wheel -->
+    <div id="loading-image"></div>
+
+    <style>
+        /* Ajax loading wheel */
+        
+        #loading-image {
+        display:none;
+        text-align:center;
+        margin-left:50%;
+        margin-top: 50px;
+        margin-bottom: 50px;
+        border: 16px solid #f3f3f3; /* Light grey */
+        border-top: 16px solid #005e8c; /* Blue */
+        border-radius: 50%;
+        width: 120px;
+        height: 120px;
+        animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+        }
+        
+        /* Persistent navigation classes */
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        .persistent {
+            top:0;
+            position:fixed;
+            margin-top:25px;
+        }
+        
+        .persistent hr {
+            display:none;
+        }
+        
+        aside #toc p {
+            font-size: 16px;
+            margin-left: 25px;
+            margin-bottom: 12px;
+        }
+        
+        .bottom {
+            top:auto;
+        }
+    </style>
+    <div class="page-body">
+        <div class="contained">
+            <div class="main-body">
+                <div id="root"></div>
+            </div>
+            <div class="side-column-container side-column-desktop">
+                <div class="side-column">
+                    <aside class="side-callout image-callout island-callout">
+                        <div class="callout-inner">
+                            <div id="ead-toc"></div>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        //move side nav (Table of Contents) if screen gets bigger or smaller        
+        function moveTable() {
+            var windowSize = $(window).width();
+            if( windowSize > 800 && $("div#root > div#toc").length ) {
+                $("#toc").detach().appendTo("#ead-toc");
+                } else if( windowSize <= 800 && $("div#ead-toc > div#toc").length ) {
+                $("#toc").detach().insertAfter("#ead-contact-info");
+                }
+            }       
+        window.addEventListener("resize", moveTable);
+        
+        //AJAX
+        var url_string = window.location.href;
+        var url = new URL(url_string);
+        var param = url.searchParams.get("file");
+        $(document).ready(function(){
+            $.ajax({
+                url: "finding-aids.php",
+                type: 'GET',
+                data: {file : param},
+                contentType: "charset=utf-8",
+                beforeSend: function() {
+                    $("#loading-image").show();
+                    },
+                success: function(result) {
+                    $("#loading-image").hide();
+                    $("#root").html(result);
+                    },
+                statusCode: {
+                    404: function() {
+                        $("#root").html("Error: The finding aid you requested is either unavailable or could not be accessed. If you continue to experience problems, please file a support ticket at <a href='/contact-us/report-a-problem.html'>Report a Problem</a>");
+                        }
+                    },
+                error: function(jaXHT,textStatus,errorThrown) {
+                    $("#root").html("Error: The finding aid you requested is either unavailable or could not be accessed. If you continue to experience problems, please file a support ticket at <a href='/contact-us/report-a-problem.html'>Report a Problem</a>");
+                    }
+            });
+            
+            //make adjustments after AJAX is complete
+            $( document ).ajaxComplete(function() {
+                //add responsive table class
+                $("table").addClass("table-scroll");
+                
+                //move Table of Contents nav to side window on large screens
+                var windowSize = $(window).width();
+                if(windowSize > 800) {
+                    $("#toc").detach().appendTo("#ead-toc");
+                    }
+                
+                //change page title
+                var pageTitle = $("#root h1").text() + " - University Libraries - Catholic University of America - Washington, D.C.";
+                document.title = pageTitle;
+            });
+        });
+        
+        //make side nav sticky
+        function persistentNav(e) {
+            var windowSize = $(window).width();
+            if(windowSize > 800) {
+                var asideWidth = $("#toc").parents("aside").width();
+                var scroll = $(window).scrollTop();
+                var footerTop = $("footer").offset().top;
+                var scrollBottom = scroll + $(window).height();
+                var tocHt = $("#toc").parents("aside").height();
+                //if scroll was down
+                if(this.oldScroll < this.scrollY) {
+                    var os = $('#ead-toc').offset().top;
+                    if(scroll >= os){
+                        $('#toc').parents('aside').addClass('persistent');
+                        $(".persistent").width(asideWidth);
+                        //add overflow scroll if necessary
+                        if(($(".persistent").outerHeight() + 25) > $(window).height()) {
+                            $(".persistent").height($(window).height() - 100);
+                            $(".persistent").css("overflow","scroll");
+                            }
+                        }
+                    //handle persistent nav at bottom of page
+                    if(scroll + tocHt >= footerTop) {
+                        $("#toc").parents("aside").addClass("bottom");
+                        $("#toc").parents("aside").css("bottom",(scrollBottom - footerTop));
+                        }
+                    }
+                //if scroll was up
+                if(this.oldScroll > this.scrollY) {
+                    var os = $('#expanding-side-nav').offset().top;
+                    var ht = $('#expanding-side-nav').height();
+                    if(scroll < os + ht){
+                        $('#toc').parents('aside').removeClass('persistent');
+                        if($("#toc hr").length == 0) {
+                            $("#toc").append("<hr />");
+                            }
+                        }
+                    if($("#toc").parents("aside").hasClass("bottom")) {
+                        $("#toc").parents("aside").css("bottom", (scrollBottom - footerTop));
+                        }
+                    //remove bottom class if necessary
+                    if((scroll + tocHt) < footerTop && $("#toc").parents("aside").hasClass("bottom")) {
+                        $("#toc").parents("aside").removeClass("bottom");
+                        $("#toc").parents("aside").css("bottom","auto");
+                        }
+                    }
+                this.oldScroll = this.scrollY;
+                }
+            }
+            window.addEventListener("scroll", persistentNav);
+        </script>
+    </body>
+</html>
